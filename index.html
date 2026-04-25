@@ -1,131 +1,298 @@
- <!DOCTYPE html>
+<!DOCTYPE html>
 <html>
 <head>
-  <title>Debatrixx</title>
+  <title>DEBATRIXX</title>
+
+  <script src="https://download.agora.io/sdk/release/AgoraRTC_N.js"></script>
+
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&family=Orbitron:wght@500&display=swap" rel="stylesheet">
 
   <style>
     body {
       margin: 0;
-      font-family: Arial, sans-serif;
-      background: linear-gradient(135deg, #0f172a, #1e293b);
+      font-family: 'Inter', sans-serif;
+      background: #0f0f1a;
       color: white;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+    }
+
+    header {
+      padding: 18px;
+      background: #141428;
       text-align: center;
     }
 
-    .box {
-      background: #111827;
-      padding: 30px;
-      border-radius: 15px;
-      max-width: 420px;
-      margin: 80px auto;
-      box-shadow: 0 0 20px rgba(0,0,0,0.5);
+    .app { display:flex; flex:1; }
+
+    .sidebar {
+      width:260px;
+      background:#141428;
+      padding:15px;
+    }
+
+    .roomCard {
+      background:rgba(255,255,255,0.06);
+      padding:12px;
+      margin-bottom:10px;
+      border-radius:10px;
+      cursor:pointer;
+    }
+
+    .main {
+      flex:1;
+      padding:20px;
+      display:flex;
+      flex-direction:column;
     }
 
     input {
-      width: 100%;
-      padding: 12px;
-      margin: 8px 0;
-      border-radius: 8px;
-      border: none;
+      padding:12px;
+      border-radius:10px;
+      border:none;
+      background:rgba(255,255,255,0.08);
+      color:white;
+      margin:5px 0;
     }
 
     button {
-      width: 100%;
-      padding: 12px;
-      background: #2563eb;
-      color: white;
-      border: none;
-      border-radius: 8px;
-      cursor: pointer;
-      font-weight: bold;
+      padding:12px;
+      border-radius:10px;
+      border:none;
+      margin-top:5px;
+      background:#4da6ff;
+      cursor:pointer;
     }
 
-    button:hover {
-      background: #1d4ed8;
+    .chat {
+      flex:1;
+      overflow:auto;
+      margin:10px 0;
     }
 
-    .post {
-      margin-top: 15px;
-      padding: 12px;
-      background: #1f2937;
-      border-radius: 10px;
-      text-align: left;
+    .msg {
+      background:rgba(255,255,255,0.06);
+      padding:8px;
+      margin-bottom:5px;
+      border-radius:8px;
     }
 
-    a {
-      color: #60a5fa;
-    }
-
-    .delete-btn {
-      margin-top: 8px;
-      background: #ef4444;
-    }
-
-    .delete-btn:hover {
-      background: #dc2626;
+    video {
+      width:140px;
+      margin:5px;
+      border-radius:10px;
     }
   </style>
 </head>
 
 <body>
 
-<div class="box">
-  <h1>Debatrixx</h1>
-  <p>Start your own debate.</p>
+<header>
+  <h1>DEBATRIXX</h1>
+  <div>
+    FOUNDER: ALBION SELIMI | CO-FOUNDER: ARDIT DZJELJADINI
+  </div>
+</header>
 
-  <input id="topic" placeholder="Your hot take">
-  <input id="link" placeholder="Call link (Zoom/Meet)">
+<div class="app">
 
-  <button onclick="addDebate()">Post Debate</button>
-
-  <div id="debates"></div>
+<div class="sidebar">
+  <h3>Public Rooms</h3>
+  <div id="publicRooms"></div>
 </div>
 
-<script>
-let debates = JSON.parse(localStorage.getItem("debates")) || [];
+<div class="main">
 
-function addDebate() {
-  let topic = document.getElementById("topic").value;
-  let link = document.getElementById("link").value;
+<div id="setup">
+  <input id="username" placeholder="Username">
+  <input id="topic" placeholder="Room topic">
+  <input id="maxUsers" placeholder="Max users">
 
-  if (topic.trim() === "" || link.trim() === "") return;
+  <button onclick="createRoom()">Create Room</button>
 
-  debates.push({ topic, link });
-  localStorage.setItem("debates", JSON.stringify(debates));
+  <input id="joinCode" placeholder="Code">
+  <button onclick="joinByCode()">Join Private</button>
+</div>
 
-  // 🔥 clears inputs
-  document.getElementById("topic").value = "";
-  document.getElementById("link").value = "";
+<div id="room" style="display:none;">
+  <h3 id="roomTitle"></h3>
 
-  renderDebates();
+  <div id="messages" class="chat"></div>
+
+  <input id="msgInput" placeholder="Type message...">
+
+  <button onclick="sendMsg()">Send</button>
+
+  <button onclick="goBack()">Back</button>
+
+  <button onclick="joinCall()">Join Call</button>
+  <button onclick="leaveCall()">Leave Call</button>
+
+  <div id="videos"></div>
+</div>
+
+</div>
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-app.js";
+import { getFirestore, collection, addDoc, onSnapshot, query, where, getDocs, orderBy, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyB5N2fi-G73BtY6ptTRI-vzkxfLGRB-Hy4",
+  authDomain: "debatrixx-aaa44.firebaseapp.com",
+  projectId: "debatrixx-aaa44"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+/* UNIQUE USER */
+let userId = localStorage.getItem("uid");
+if (!userId) {
+  userId = Math.random().toString(36).substring(2);
+  localStorage.setItem("uid", userId);
 }
 
-function renderDebates() {
-  let html = "";
+let currentRoom = null;
 
-  debates.forEach((d, index) => {
-    html += `
-      <div class="post">
-        <div>${d.topic}</div>
-        <a href="${d.link}" target="_blank">Join Debate</a><br>
-        <button class="delete-btn" onclick="deleteDebate(${index})">Delete</button>
-      </div>
-    `;
+/* CREATE */
+window.createRoom = async ()=>{
+  if(!topic.value || !maxUsers.value) return alert("Fill all");
+
+  const docRef = await addDoc(collection(db,"rooms"),{
+    topic:topic.value,
+    code:Math.random().toString(36).substring(2,8),
+    maxUsers:parseInt(maxUsers.value)
   });
 
-  document.getElementById("debates").innerHTML = html;
-}
+  openRoom(docRef.id,topic.value);
+};
 
-function deleteDebate(index) {
-  debates.splice(index, 1);
-  localStorage.setItem("debates", JSON.stringify(debates));
-  renderDebates();
-}
+/* PUBLIC */
+onSnapshot(collection(db,"rooms"), snap=>{
+  let html="";
+  snap.docs.forEach(r=>{
+    const d=r.data();
+    html+=`<div class="roomCard" onclick="joinRoom('${r.id}','${d.topic}',${d.maxUsers})">
+      ${d.topic}
+    </div>`;
+  });
+  publicRooms.innerHTML=html;
+});
 
-renderDebates();
+/* JOIN */
+window.joinRoom = async(id,title,max)=>{
+  const userRef = doc(db,"rooms",id,"users",userId);
+  const exists = await getDoc(userRef);
+
+  const usersSnap = await getDocs(collection(db,"rooms",id,"users"));
+
+  if (usersSnap.size >= max) return alert("Room full");
+
+  if (!exists.exists()) {
+    await setDoc(userRef,{joined:true});
+  }
+
+  openRoom(id,title);
+};
+
+window.joinByCode = async()=>{
+  const snap = await getDocs(query(collection(db,"rooms"), where("code","==",joinCode.value)));
+  if(snap.empty) return alert("Invalid");
+
+  const r=snap.docs[0];
+  const d=r.data();
+
+  joinRoom(r.id,d.topic,d.maxUsers);
+};
+
+/* OPEN */
+window.openRoom = (id,title)=>{
+  currentRoom=id;
+  setup.style.display="none";
+  room.style.display="block";
+  roomTitle.innerText=title;
+
+  onSnapshot(query(collection(db,"rooms",id,"messages"),orderBy("createdAt")), snap=>{
+    let html="";
+    snap.docs.forEach(m=>{
+      const d=m.data();
+      html+=`<div class="msg">${d.user}: ${d.text}</div>`;
+    });
+    messages.innerHTML=html;
+    messages.scrollTop = messages.scrollHeight;
+  });
+};
+
+/* BACK */
+window.goBack=()=>{
+  setup.style.display="block";
+  room.style.display="none";
+};
+
+/* SEND */
+window.sendMsg=async()=>{
+  if(!msgInput.value) return;
+
+  await addDoc(collection(db,"rooms",currentRoom,"messages"),{
+    text:msgInput.value,
+    user:username.value||"Anon",
+    createdAt:Date.now()
+  });
+
+  msgInput.value="";
+};
+
+/* 🔥 ENTER KEY FIX */
+document.getElementById("msgInput").addEventListener("keydown", (e)=>{
+  if(e.key === "Enter"){
+    e.preventDefault();
+    sendMsg();
+  }
+});
+
+/* CALLS */
+const APP_ID="a77e9ac654bf419db638a95bb95d7eac";
+let client,localTracks=[];
+
+window.joinCall=async()=>{
+  client=AgoraRTC.createClient({mode:"rtc",codec:"vp8"});
+  await client.join(APP_ID,currentRoom,null,userId);
+
+  localTracks=await AgoraRTC.createMicrophoneAndCameraTracks();
+
+  const video=document.createElement("video");
+  video.autoplay=true;
+  video.muted=true;
+  videos.appendChild(video);
+
+  localTracks[1].play(video);
+  await client.publish(localTracks);
+
+  client.on("user-published", async (user,mediaType)=>{
+    await client.subscribe(user,mediaType);
+
+    if(mediaType==="video"){
+      const remote=document.createElement("video");
+      remote.autoplay=true;
+      videos.appendChild(remote);
+      user.videoTrack.play(remote);
+    }
+
+    if(mediaType==="audio"){
+      user.audioTrack.play();
+    }
+  });
+};
+
+window.leaveCall=async()=>{
+  localTracks.forEach(t=>{t.stop();t.close();});
+  await client.leave();
+  videos.innerHTML="";
+};
 </script>
 
 </body>
 </html>
-
-
