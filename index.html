@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Debatrixx</title>
+
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: linear-gradient(135deg, #0f172a, #1e293b);
+      color: white;
+      text-align: center;
+    }
+
+    .box {
+      background: #111827;
+      padding: 30px;
+      border-radius: 15px;
+      max-width: 420px;
+      margin: 80px auto;
+      box-shadow: 0 0 20px rgba(0,0,0,0.5);
+    }
+
+    input {
+      width: 100%;
+      padding: 12px;
+      margin: 8px 0;
+      border-radius: 8px;
+      border: none;
+    }
+
+    button {
+      width: 100%;
+      padding: 12px;
+      background: #2563eb;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: bold;
+    }
+
+    button:hover {
+      background: #1d4ed8;
+    }
+
+    .post {
+      margin-top: 15px;
+      padding: 12px;
+      background: #1f2937;
+      border-radius: 10px;
+      text-align: left;
+    }
+
+    a {
+      color: #60a5fa;
+    }
+
+    .delete-btn {
+      margin-top: 8px;
+      background: #ef4444;
+    }
+
+    .delete-btn:hover {
+      background: #dc2626;
+    }
+  </style>
+</head>
+
+<body>
+
+<div class="box">
+  <h1>Debatrixx</h1>
+  <p>Start your own debate.</p>
+
+  <input id="topic" placeholder="Your hot take">
+  <input id="link" placeholder="Call link (Zoom/Meet)">
+
+  <button onclick="addDebate()">Post Debate</button>
+
+  <div id="debates"></div>
+</div>
+
+<script>
+let debates = JSON.parse(localStorage.getItem("debates")) || [];
+
+function addDebate() {
+  let topic = document.getElementById("topic").value;
+  let link = document.getElementById("link").value;
+
+  if (topic.trim() === "" || link.trim() === "") return;
+
+  debates.push({ topic, link });
+  localStorage.setItem("debates", JSON.stringify(debates));
+
+  // 🔥 clears inputs
+  document.getElementById("topic").value = "";
+  document.getElementById("link").value = "";
+
+  renderDebates();
+}
+
+function renderDebates() {
+  let html = "";
+
+  debates.forEach((d, index) => {
+    html += `
+      <div class="post">
+        <div>${d.topic}</div>
+        <a href="${d.link}" target="_blank">Join Debate</a><br>
+        <button class="delete-btn" onclick="deleteDebate(${index})">Delete</button>
+      </div>
+    `;
+  });
+
+  document.getElementById("debates").innerHTML = html;
+}
+
+function deleteDebate(index) {
+  debates.splice(index, 1);
+  localStorage.setItem("debates", JSON.stringify(debates));
+  renderDebates();
+}
+
+renderDebates();
+</script>
+
+</body>
+</html>
+
+
